@@ -129,7 +129,11 @@ endforeach()
 
 if (CMAKE_COMPILER_IS_GNUCXX)
     #set (CMAKE_CXX_FLAGS "-Wall -Wextra -Wno-unused-parameter -Wold-style-cast")
-    set (CMAKE_CXX_FLAGS "-g")
+    # local patch (SU2-NEMO L-13, 2026-10-02): append instead of overwrite, so an
+    # externally supplied CMAKE_CXX_FLAGS survives (needed to build libmutation++
+    # against the same Eigen headers as the SU2 binary; mismatched Eigen inline
+    # memory functions across the .so boundary double-free -- see the L-13 report).
+    set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g")
 endif ()
 
 if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
