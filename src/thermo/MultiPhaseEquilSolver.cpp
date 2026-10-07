@@ -1546,6 +1546,8 @@ bool MultiPhaseEquilSolver::updateMinGSolution(const double* const p_g)
         cout << "Error in computing the min-g solution in equilibrium solver!" << endl;
         if (ret < 0)
             cout << "--> no solution exists for the given problem" << endl;
+        else if (ret == 2)
+            cout << "--> simplex iteration limit exceeded (cycling tableau)" << endl;
         else
             cout << "--> solution is unbounded" << endl;
         return false;
@@ -1623,6 +1625,8 @@ bool MultiPhaseEquilSolver::updateMaxMinSolution()
         cout << "Error in computing the max-min solution in equilibrium solver!" << endl;
         if (ret < 0)
             cout << "--> no solution exists for the given problem" << endl;
+        else if (ret == 2)
+            cout << "--> simplex iteration limit exceeded (cycling tableau)" << endl;
         else
             cout << "--> solution is unbounded" << endl;
         return false;

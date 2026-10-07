@@ -1,0 +1,28 @@
+<!--
+  L-13 gamma(T) probe: air_5 catalysis with Arrhenius gamma(T).
+  M++ gamma_T rate law: rate = (v_th/4) * pre_exp * exp(-Ta/Tw) * rho_react/M_react
+  with NO stoichiometric division for the homonuclear "N + N => N2" reactant
+  pair (the rate law is designed for single-gas-reactant ablation), so the
+  mass rates come out as w_N = 2*pre_exp*exp(-Ta/Tw)*(v_th/4)*rho_N and
+  w_N2 = -2*pre_exp*exp(-Ta/Tw)*(v_th/4)*rho_N (mass balanced). The effective
+  catalytic efficiency is therefore gamma_eff(T) = 2*pre_exp*exp(-Ta/T);
+  pre_exp below is halved relative to the nominal gamma0 to compensate:
+    gamma_eff(T) = 0.2 * exp(-(1000 K)/T),  pre_exp = 0.2*exp(10/3)/2 = 2.80316
+    -> gamma_eff(300 K) = 0.200000 (identity check vs gamma_const 0.2)
+    -> gamma_eff(400 K) = 0.460214 (identity check vs gamma_const 0.460214)
+-->
+<gsi gsi_mechanism = "phenomenological_mass">
+
+    <surface_properties type = "none" >
+    </surface_properties>
+
+    <surface_chemistry>
+        <reaction type= "catalysis" formula="N + N => N2">
+            <gamma_T pre_exp = "2.80316" T = "1000.0" > N </gamma_T>
+        </reaction>
+        <reaction type= "catalysis" formula="O + O => O2">
+            <gamma_T pre_exp = "2.80316" T = "1000.0" > O </gamma_T>
+        </reaction>
+    </surface_chemistry>
+
+</gsi>

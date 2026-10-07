@@ -339,7 +339,8 @@ void simp3(Real *const tableau, const int n, const int i1, const int k1,
  * @param iposv    M-dim array storing the left-hand variable order on return,
  *                 i.e. x[iposv[i]] = tableau[i+1][0] if iposv[i] < n+1
  *
- * @return  0 = success, < 0 = no solution, > 0 = solution unbounded
+ * @return  0 = success, < 0 = no solution, 1 = solution unbounded,
+ *          2 = iteration limit exceeded (cycling tableau)
  *
  * @author J.B. Scoggins (jbscoggi@gmail.com)
  * @date   November 27, 2011
@@ -367,6 +368,13 @@ int simplex(Real *const tableau, const int m, const int n, const int m1,
     for (i = 0; i < m; ++i)
         iposv[i] = n+i;
     
+    // Maximum number of pivot operations allowed in each phase; degenerate
+    // tableaus can make the pivoting cycle forever, which would hang any
+    // application relying on the equilibrium solver (observed with garbage
+    // states passed by an external CFD code) — return an error instead
+    const int max_pivots = 100 * (m + n + 10);
+    int pivots = 0;
+
     // PHASE 1:
     // Use auxiliary objective function to compute initial solution, if there
     // are no >= or = constraints then the origin is an initial solution
@@ -458,6 +466,8 @@ int simplex(Real *const tableau, const int m, const int n, const int m1,
             is = izrov[kp];
             izrov[kp] = iposv[ip];
             iposv[ip] = is;
+
+            if (++pivots > max_pivots) return 2; // iteration limit exceeded
         } // while (true)
     } // if (m2 + m3 != 0)
     
@@ -484,6 +494,8 @@ int simplex(Real *const tableau, const int m, const int n, const int m1,
         is = izrov[kp];
         izrov[kp] = iposv[ip];
         iposv[ip] = is;
+
+        if (++pivots > max_pivots) return 2; // iteration limit exceeded
     }
     
 } // simplex

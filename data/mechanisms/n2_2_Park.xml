@@ -1,0 +1,15 @@
+<!--
+Park N2 dissociation mechanism for a 2-species nitrogen mixture (N2, N).
+Rate (N2 + M = 2N + M) taken from Park et al., JTHT 15(1):76-90, 2001,
+identical to the N2 dissociation reaction in the air5_Park mechanism.
+-->
+<mechanism name="n2_2_Park">
+
+    <arrhenius_units A="mol,cm,s,K" E="kcal,mol,K" />
+
+    <!-- Park, 2001 -->
+    <reaction formula="N2+M=2N+M">
+        <arrhenius A="3.0E+22" n="-1.6" T="113200.0" />
+    </reaction>
+
+</mechanism>

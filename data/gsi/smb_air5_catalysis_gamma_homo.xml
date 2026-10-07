@@ -1,0 +1,21 @@
+<!--
+  Homonuclear-only gamma-model catalysis for air_5, meant to reproduce the
+  COOLFluiD BasicCatalycityModel (modelID 2: equal Gamma for N and O, no
+  heteronuclear N + O => NO channel) for cross-validation of the GSI-based
+  NoSlipWallIsothermalNSrvtGSI boundary condition.
+-->
+<gsi gsi_mechanism = "phenomenological_mass">
+
+    <surface_properties type = "none" >
+    </surface_properties>
+
+    <surface_chemistry>
+        <reaction type= "catalysis" formula="N + N => N2">
+            <gamma_const> N:.1 </gamma_const>
+        </reaction>
+        <reaction type= "catalysis" formula="O + O => O2">
+            <gamma_const> O:.1 </gamma_const>
+        </reaction>
+    </surface_chemistry>
+
+</gsi>

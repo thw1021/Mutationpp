@@ -22,3 +22,11 @@ dist/
 
 # OS specifics
 .DS_Store
+paper/
+
+# 本地安装脚本与生成的环境文件
+install_mutationpp.sh
+env_mpp.sh
+
+mutationpp-docs/
+

@@ -1,0 +1,21 @@
+<!--
+  L-13/L0 A/B probe: air_5 homonuclear catalysis with constant gamma = 0.2,
+  matching TestCases/nonequilibrium/visc_wedge/partial_cat.cfg
+  (CATALYTIC_EFFICIENCY = 0.2) for the GSI-vs-CatRecombTable comparison.
+  Same channels as the shipped smb_air5_catalysis_gamma_homo.xml (gamma 0.1).
+-->
+<gsi gsi_mechanism = "phenomenological_mass">
+
+    <surface_properties type = "none" >
+    </surface_properties>
+
+    <surface_chemistry>
+        <reaction type= "catalysis" formula="N + N => N2">
+            <gamma_const> N:.2 </gamma_const>
+        </reaction>
+        <reaction type= "catalysis" formula="O + O => O2">
+            <gamma_const> O:.2 </gamma_const>
+        </reaction>
+    </surface_chemistry>
+
+</gsi>

@@ -1,0 +1,21 @@
+<!--
+  L-13 gamma(T) probe control: air_5 catalysis with constant gamma = 0.460214,
+  the exact gamma_eff(400 K) of smb_air5_catalysis_gammat.xml
+  (gamma_eff(T) = 0.2*exp(-(1000 K)/T)); paired with a Tw = 400 K isothermal
+  run of that file for the gamma(T) pathway identity check.
+-->
+<gsi gsi_mechanism = "phenomenological_mass">
+
+    <surface_properties type = "none" >
+    </surface_properties>
+
+    <surface_chemistry>
+        <reaction type= "catalysis" formula="N + N => N2">
+            <gamma_const> N:0.460214 </gamma_const>
+        </reaction>
+        <reaction type= "catalysis" formula="O + O => O2">
+            <gamma_const> O:0.460214 </gamma_const>
+        </reaction>
+    </surface_chemistry>
+
+</gsi>

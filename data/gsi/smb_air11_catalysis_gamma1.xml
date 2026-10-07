@@ -1,0 +1,23 @@
+<!--
+  L-13/L0 A/B probe: air_11 homonuclear catalysis with constant gamma = 1.0,
+  matching TestCases/nonequilibrium/air11_catalytic/air11_catalytic.cfg
+  (CATALYTIC_EFFICIENCY = 1.0) for the GSI-vs-CatRecombTable comparison.
+  air_11 species order (Mutation++): e-, N+, O+, NO+, N2+, O2+, N, O, NO, N2, O2.
+  The electron, all ions and NO get no surface channel -> inert, the same
+  convention as the air_11 CatRecombTable (no surface charge neutralization).
+-->
+<gsi gsi_mechanism = "phenomenological_mass">
+
+    <surface_properties type = "none" >
+    </surface_properties>
+
+    <surface_chemistry>
+        <reaction type= "catalysis" formula="N + N => N2">
+            <gamma_const> N:1.0 </gamma_const>
+        </reaction>
+        <reaction type= "catalysis" formula="O + O => O2">
+            <gamma_const> O:1.0 </gamma_const>
+        </reaction>
+    </surface_chemistry>
+
+</gsi>

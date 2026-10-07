@@ -1,0 +1,12 @@
+<!-- Pure nitrogen mixture (N2, N) for CUBRC Run 28 calibration -->
+<mixture mechanism="n2_2_Park">
+
+    <species>
+        N2 N
+    </species>
+
+    <element_compositions default="default">
+        <composition name="default"> N:1.0 </composition>
+    </element_compositions>
+
+</mixture>
