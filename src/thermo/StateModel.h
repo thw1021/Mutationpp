@@ -280,6 +280,45 @@ public:
             p_omega[m_transfer_models[i].first] +=
                 m_transfer_models[i].second->source();
     }
+
+    /**
+     * Analytic value and derivatives of the total energy transfer source
+     * terms with respect to T, Tv and every species density.
+     *
+     * Returns false if any registered transfer model cannot provide analytic
+     * derivatives; in that case the outputs must be ignored by the caller and
+     * a finite-difference path used instead.
+     */
+    virtual bool energyTransferSourceJacobian(
+        double* const p_omega, double& dT, double& dTv, double* const dRho)
+    {
+        for (int i = 0; i < m_nenergy-1; ++i)
+            p_omega[i] = 0.0;
+
+        dT = 0.0;
+        dTv = 0.0;
+        for (int i = 0; i < m_thermo.nSpecies(); ++i)
+            dRho[i] = 0.0;
+
+        std::vector<double> model_dRho(m_thermo.nSpecies(), 0.0);
+
+        for (int i = 0; i < m_transfer_models.size(); ++i) {
+            double model_dT = 0.0, model_dTv = 0.0;
+            std::fill(model_dRho.begin(), model_dRho.end(), 0.0);
+
+            if (!m_transfer_models[i].second->sourceJacobian(
+                    model_dT, model_dTv, model_dRho.data()))
+                return false;
+
+            const int eq = m_transfer_models[i].first;
+            p_omega[eq] += m_transfer_models[i].second->source();
+            dT  += model_dT;
+            dTv += model_dTv;
+            for (int s = 0; s < m_thermo.nSpecies(); ++s)
+                dRho[s] += model_dRho[s];
+        }
+        return true;
+    }
     
 protected:
     /**

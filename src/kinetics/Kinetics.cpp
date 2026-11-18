@@ -367,6 +367,56 @@ void Kinetics::netProductionRates(double* const p_wdot)
 
 //==============================================================================
 
+void Kinetics::netProductionRatesJacobian(
+    double* const p_dT, double* const p_dTv)
+{
+    const int ns = m_thermo.nSpecies();
+
+    std::fill(p_dT,  p_dT  + ns, 0.0);
+    std::fill(p_dTv, p_dTv + ns, 0.0);
+
+    // Special case of no reactions
+    if (nReactions() == 0)
+        return;
+
+    const size_t nr = nReactions();
+    ArrayXd conc =
+        (m_thermo.numberDensity() / NA) *
+        Map<const ArrayXd>(m_thermo.X(), m_thermo.nSpecies());
+
+    // Rates of progress at the current state (same expressions as
+    // netProductionRates, so the derivatives are consistent with the source)
+    forwardRatesOfProgress(conc.data(), mp_ropf);
+    backwardRatesOfProgress(conc.data(), mp_ropb);
+
+    mp_rates->updateDerivative(m_thermo);
+    const double* dlnkf_dT  = mp_rates->dlnkf_dT();
+    const double* dlnkf_dTv = mp_rates->dlnkf_dTv();
+    const double* dlnkb_dT  = mp_rates->dlnkb_dT();
+    const double* dlnkb_dTv = mp_rates->dlnkb_dTv();
+
+    std::vector<double> ropdT(nr), ropdTv(nr);
+    for (size_t r = 0; r < nr; ++r) {
+        ropdT[r]  = mp_ropf[r]*dlnkf_dT[r]  - mp_ropb[r]*dlnkb_dT[r];
+        ropdTv[r] = mp_ropf[r]*dlnkf_dTv[r] - mp_ropb[r]*dlnkb_dTv[r];
+    }
+
+    m_reactants.decrSpecies(ropdT.data(), p_dT);
+    m_rev_prods.incrSpecies(ropdT.data(), p_dT);
+    m_irr_prods.incrSpecies(ropdT.data(), p_dT);
+
+    m_reactants.decrSpecies(ropdTv.data(), p_dTv);
+    m_rev_prods.incrSpecies(ropdTv.data(), p_dTv);
+    m_irr_prods.incrSpecies(ropdTv.data(), p_dTv);
+
+    for (int i = 0; i < ns; ++i) {
+        p_dT[i]  *= m_thermo.speciesMw(i);
+        p_dTv[i] *= m_thermo.speciesMw(i);
+    }
+}
+
+//==============================================================================
+
 void Kinetics::jacobianRho(double* const p_jac)
 {
     // Special case of no reactions

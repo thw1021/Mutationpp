@@ -154,6 +154,68 @@ double MillikanWhiteModel::relaxationTime(
 }
 
 
+void MillikanWhiteModel::relaxationTimeJacobian(
+    const Mutation::Thermodynamics::Thermodynamics& thermo,
+    double& dT, double* const dRho) const
+{
+    const size_t offset = (thermo.hasElectrons() ? 1 : 0);
+    const size_t nh = thermo.nHeavy();
+    const double T = thermo.T();
+    const double p_atm = thermo.P() / ONEATM;
+
+    //--------------------------------------------------------------------------
+    // Millikan-White part: tau = num/(Sx*p) with
+    //   num = sum_j X_j A_j,  A_j = exp(a_j (T^-1/3 - b_j) - 18.42), Sx = sum_j X_j
+    //--------------------------------------------------------------------------
+    const Eigen::Map<const Eigen::ArrayXd> Xh(thermo.X() + offset, nh);
+    const double T13  = std::pow(T, -1.0/3.0);
+    const double dT13 = -(1.0/3.0)*std::pow(T, -4.0/3.0);
+
+    const Eigen::ArrayXd A =
+        (m_data.a()*(T13 - m_data.b()) - 18.42).exp();
+    const double num = (Xh*A).sum();
+    const double Sx  = Xh.sum();
+
+    // d/dT: only A_j depends on T (and p through P = conc*Ru*T at fixed X)
+    const double dnum_dT = (Xh*(A*m_data.a()*dT13)).sum();
+    const double dp_dT   = p_atm / T;
+
+    dT = (dnum_dT*Sx*p_atm - num*(Sx*dp_dT)) / (Sx*p_atm*Sx*p_atm);
+
+    // d/drho_s: through X (dX_j/drho_s = (delta_js - X_j)/(M_s*C)) and
+    // through p_atm (dp_atm/drho_s = Ru*T/(M_s*ONEATM)).
+    const double C = thermo.numberDensity() / NA;  // total molar concentration
+    for (size_t s = 0; s < thermo.nSpecies(); ++s)
+        dRho[s] = 0.0;
+
+    for (size_t s = offset; s < thermo.nSpecies(); ++s) {
+        const double Ms = thermo.speciesMw(s);
+        const double dSx  = (1.0 - Sx)/(Ms*C);
+        const double dnum = (A[s - offset] - num)/(Ms*C);
+        const double dp   = RU*T/(Ms*ONEATM);
+
+        dRho[s] = (dnum*Sx*p_atm - num*(dSx*p_atm + Sx*dp))
+                  / (Sx*p_atm*Sx*p_atm);
+    }
+
+    //--------------------------------------------------------------------------
+    // Park correction: tau = 1/(ni*ci*sigma), ni = N_A*rho_i/M_i,
+    //   ci ~ T^0.5, sigma ~ T^-2  =>  tau ~ T^1.5, dtau/dT = 1.5*tau/T
+    //--------------------------------------------------------------------------
+    const double ni = thermo.numberDensity() * thermo.X()[m_data.speciesIndex()];
+    const double ci = std::sqrt(8*RU*T/(PI*m_data.molecularWeight()));
+    const double tau_park = 1.0/(ni * ci * m_data.limitingCrossSection(T));
+
+    if (std::isfinite(tau_park) && ni > 0.0) {
+        dT += 1.5*tau_park/T;
+
+        const size_t iv = m_data.speciesIndex();
+        if (iv >= offset)
+            dRho[iv] -= tau_park * (NA/thermo.speciesMw(iv)) / ni;
+    }
+}
+
+
 struct MillikanWhiteModelDB::Data
 {
     const class Thermodynamics& thermo;

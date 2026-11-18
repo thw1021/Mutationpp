@@ -62,12 +62,24 @@ public:
 		m_ns = mixture().nSpecies();
 		mp_wrk1 = new double [m_ns];
 		mp_wrk2 = new double [m_ns];
+		mp_wrk3 = new double [m_ns];
+		mp_dT   = new double [m_ns];
+		mp_dTv  = new double [m_ns];
+		mp_cpv  = new double [m_ns];
+		mp_cpel = new double [m_ns];
+		mp_jac  = new double [m_ns*m_ns];
 	};
 
 	~OmegaCV()
 	{
 		delete [] mp_wrk1;
 		delete [] mp_wrk2;
+		delete [] mp_wrk3;
+		delete [] mp_dT;
+		delete [] mp_dTv;
+		delete [] mp_cpv;
+		delete [] mp_cpel;
+		delete [] mp_jac;
 	};
 /**
  * Computes the source terms of the Vibration-Chemistry energy transfer in \f$ [J/(m^3\cdot s)] \f$
@@ -92,8 +104,59 @@ private:
 	int m_ns;
 	double* mp_wrk1;
 	double* mp_wrk2;
+	double* mp_wrk3;
+	double* mp_dT;
+	double* mp_dTv;
+	double* mp_cpv;
+	double* mp_cpel;
+	double* mp_jac;
 
 	double const compute_source_Candler();
+
+public:
+	/**
+	 * Analytic derivatives of Omega_CV =
+	 * Ru*T*sum_i hv_i(Tv) wdot_i(T,rho)/M_i with respect to T, Tv and rho_s.
+	 *
+	 * d/dT  = Ru*sum hv_i wdot_i/M_i + Ru*T*sum hv_i (dwdot_i/dT)/M_i
+	 * d/dTv = Ru*sum cpv_i wdot_i/M_i     (hv_i = Hv_i/(RuT), dHv_i/dTv = cpv_i*Ru)
+	 * d/dr = Ru*T*sum hv_i (dwdot_i/drho_s)/M_i
+	 * The chemistry derivatives use the analytic rate-law path (no finite
+	 * differences), so this returns the exact derivative of this model.
+	 */
+	virtual bool sourceJacobian(double& dT, double& dTv, double* const dRho)
+	{
+		const double T = mixture().T();
+
+		mixture().speciesHOverRT(NULL, NULL, NULL, mp_wrk1, NULL, NULL);
+		mixture().netProductionRates(mp_wrk2);
+		mixture().netProductionRatesJacobian(mp_dT, mp_dTv);
+		mixture().jacobianRho(mp_jac);
+		mixture().speciesCpOverR(
+			T, mixture().Te(), mixture().Tr(), mixture().Tv(),
+			mixture().Tel(), NULL, NULL, NULL, mp_cpv, mp_cpel);
+
+		dT = 0.0;
+		dTv = 0.0;
+		for (int s = 0; s < m_ns; ++s)
+			dRho[s] = 0.0;
+
+		for (int i = 0; i < m_ns; ++i) {
+			const double mw = mixture().speciesMw(i);
+			const double hv = mp_wrk1[i];
+			const double wd = mp_wrk2[i];
+
+			// hv_i = Hv_i/(Ru*T): the explicit T of the prefactor and the 1/T
+			// inside hv_i cancel, so Omega_CV = sum Hv_i wdot_i/M_i and only
+			// the chemistry derivative survives in d/dT.
+			dT  += RU*T*(hv*mp_dT[i]/mw);
+			dTv += RU*(mp_cpv[i]*wd/mw);
+
+			for (int s = 0; s < m_ns; ++s)
+				dRho[s] += RU*T*(hv*mp_jac[i*m_ns+s]/mw);
+		}
+		return true;
+	}
 };
 
  /**

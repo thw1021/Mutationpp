@@ -61,6 +61,22 @@ public:
     /// Value of source term in J/m^3-s.
     virtual double source() = 0;
 
+    /**
+     * Analytic derivatives of source() with respect to the translational
+     * temperature, the vibrational temperature and every species density
+     * (array of size Mixture::nSpecies()), evaluated at the current state.
+     *
+     * Returns false when the model cannot provide them analytically; the
+     * caller must then fall back to finite differences.  Returning a partially
+     * filled set is not allowed: a model either fills all outputs or returns
+     * false.
+     */
+    virtual bool sourceJacobian(
+        double& /*dT*/, double& /*dTv*/, double* const /*dRho*/)
+    {
+        return false;
+    }
+
 protected:
     Mixture& mixture() { return m_mixture; }
 private:

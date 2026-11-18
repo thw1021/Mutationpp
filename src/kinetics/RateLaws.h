@@ -47,6 +47,13 @@ public:
 
     virtual ~RateLaw() { };
     virtual RateLaw* clone() const = 0;
+
+    /// Logarithmic temperature derivative of the rate coefficient,
+    /// \f$ \partial \ln k / \partial T \f$, at the temperature given by
+    /// (\f$\ln T\f$, \f$1/T\f$).  Every concrete rate law must provide it so
+    /// that an analytic source-term derivative can never silently fall back to
+    /// a wrong (e.g. zero) value.
+    virtual double dlnkdT(const double lnT, const double invT) const = 0;
 };
 
 /**
@@ -76,6 +83,11 @@ public:
     
     inline double derivative(const double k, const double lnT, const double invT) const {
         return (k*invT*(m_n + m_temp*invT));
+    }
+
+    /// \f$ \partial \ln k / \partial T = T^{-1}(n + E_a/(R_u T)) \f$.
+    inline double dlnkdT(const double lnT, const double invT) const {
+        return (invT*(m_n + m_temp*invT));
     }
 
     double A() const { 

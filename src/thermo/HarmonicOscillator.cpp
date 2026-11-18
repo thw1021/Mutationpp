@@ -40,6 +40,20 @@ double HarmonicOscillator::energy(double T) const
     return energy;
 }
 
+double HarmonicOscillator::denergy(double T) const
+{
+    assert(T > 0.0);
+
+    // d/dT [theta/(exp(theta/T)-1)] = theta^2 exp(theta/T)/(T^2 (exp(theta/T)-1)^2)
+    double denergy = 0.0;
+    for (auto theta: m_characteristic_temps) {
+        const double e = std::exp(theta/T);
+        const double d = e - 1.0;
+        denergy += theta*theta*e/(T*T*d*d);
+    }
+    return denergy;
+}
+
 
 struct HarmonicOscillatorDB::Data
 {

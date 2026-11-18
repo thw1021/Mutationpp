@@ -38,24 +38,32 @@ namespace Mutation {
 //==============================================================================
     
 // Simple macro to create a temperature selector type
-#define TEMPERATURE_SELECTOR(__NAME__,__T__)\
+#define TEMPERATURE_SELECTOR(__NAME__,__T__,__DTDT__,__DTDTV__)\
 class __NAME__\
 {\
 public:\
     inline double getT(const Thermodynamics::StateModel* const state) const {\
         return ( __T__ );\
     }\
+    inline double dTdT(const Thermodynamics::StateModel* const state) const {\
+        (void) state; return ( __DTDT__ );\
+    }\
+    inline double dTdTv(const Thermodynamics::StateModel* const state) const {\
+        (void) state; return ( __DTDTV__ );\
+    }\
 };
 
 /// Temperature selector which returns the current translational temperature
-TEMPERATURE_SELECTOR(TSelector, state->T())
+TEMPERATURE_SELECTOR(TSelector, state->T(), 1.0, 0.0)
 
 /// Temperature selector which returns the current electron temperature
 //TEMPERATURE_SELECTOR(TeSelector, std::min(state->Te(), 10000.0))
-TEMPERATURE_SELECTOR(TeSelector, state->Te())
+TEMPERATURE_SELECTOR(TeSelector, state->Te(), 0.0, 1.0)
 
 /// Temperature selector which returns the current value of sqrt(T*Tv)
-TEMPERATURE_SELECTOR(ParkSelector, std::sqrt(state->T()*state->Tv()))
+TEMPERATURE_SELECTOR(ParkSelector, std::sqrt(state->T()*state->Tv()),
+    0.5*std::sqrt(state->T()*state->Tv())/state->T(),
+    0.5*std::sqrt(state->T()*state->Tv())/state->Tv())
 
 #undef TEMPERATURE_SELECTOR
 
@@ -114,7 +122,10 @@ SELECT_RATE_LAWS(EXCITATION_E,               ArrheniusTe,   ArrheniusTe)
 
 RateManager::RateManager(size_t ns, const std::vector<Reaction>& reactions)
     : m_ns(ns), m_nr(reactions.size()), mp_lnkf(NULL), mp_lnkb(NULL),
-      mp_gibbs(NULL)
+      mp_gibbs(NULL), mp_deriv_block(NULL), mp_dlnkf_dT(NULL),
+      mp_dlnkf_dTv(NULL), mp_dlnkb_dT(NULL), mp_dlnkb_dTv(NULL),
+      mp_dlnkeq_dTg(NULL), mp_dlnkf_dTg(NULL), mp_chain_dT(NULL),
+      mp_chain_dTv(NULL)
 {
     // Add all of the reactions' rate coefficients to the manager
     const size_t nr = reactions.size();
@@ -130,6 +141,18 @@ RateManager::RateManager(size_t ns, const std::vector<Reaction>& reactions)
     
     // Initialize the arrays to zero
     std::fill(mp_lnkf, mp_lnkf+block_size, 0.0);
+
+    // Temperature-derivative block (see header for the layout)
+    mp_deriv_block = new double [11*m_nr];
+    std::fill(mp_deriv_block, mp_deriv_block+11*m_nr, 0.0);
+    mp_dlnkf_dT   = mp_deriv_block;
+    mp_dlnkf_dTv  = mp_dlnkf_dT  + m_nr;
+    mp_dlnkb_dT   = mp_dlnkf_dTv + m_nr;
+    mp_dlnkb_dTv  = mp_dlnkb_dT  + m_nr;
+    mp_dlnkeq_dTg = mp_dlnkb_dTv + m_nr;
+    mp_dlnkf_dTg  = mp_dlnkeq_dTg + m_nr;
+    mp_chain_dT   = mp_dlnkf_dTg + 2*m_nr;
+    mp_chain_dTv  = mp_chain_dT  + 2*m_nr;
 }
 
 //==============================================================================
@@ -139,6 +162,8 @@ RateManager::~RateManager()
     // Storage for lnkff and lnkfb were both allocated in mp_lnkff
     if (mp_lnkf != NULL)
         delete [] mp_lnkf;
+    if (mp_deriv_block != NULL)
+        delete [] mp_deriv_block;
 }
 
 //==============================================================================
@@ -235,6 +260,49 @@ void RateManager::update(const Thermodynamics::Thermodynamics& thermo)
     
     // Subtract lnkeq(Tb) rate constants from the lnkf(Tb) to get lnkb(Tb)
     m_rate_groups.subtractLnKeq(thermo, mp_gibbs, mp_lnkb);
+}
+
+//==============================================================================
+
+void RateManager::updateDerivative(const Thermodynamics::Thermodynamics& thermo)
+{
+    if (m_nr == 0)
+        return;
+
+    // dlnkeq/dTg is additive across the groups that own each reverse rate
+    std::fill(mp_dlnkeq_dTg, mp_dlnkeq_dTg + m_nr, 0.0);
+
+    m_rate_groups.dlnkdT(
+        thermo, thermo.state(), mp_dlnkf_dTg, mp_chain_dT, mp_chain_dTv,
+        mp_dlnkeq_dTg);
+
+    // Flag the irreversible reactions: their backward rate is identically zero
+    std::vector<char> is_irr(m_nr, 0);
+    for (size_t i = 0; i < m_irr.size(); ++i)
+        is_irr[m_irr[i]] = 1;
+
+    std::vector<char> is_copy(m_nr, 0);
+    for (size_t i = 0; i < m_to_copy.size(); ++i)
+        is_copy[m_to_copy[i]] = 1;
+
+    for (size_t r = 0; r < m_nr; ++r) {
+        // Forward rate coefficient: index r
+        const double fTg = mp_dlnkf_dTg[r];
+        mp_dlnkf_dT[r]  = fTg*mp_chain_dT[r];
+        mp_dlnkf_dTv[r] = fTg*mp_chain_dTv[r];
+
+        if (is_irr[r]) {
+            mp_dlnkb_dT[r] = mp_dlnkb_dTv[r] = 0.0;
+            continue;
+        }
+
+        // Backward rate coefficient lives at index r (same group as forward)
+        // or at index r+m_nr (evaluated at the reverse group's temperature).
+        const size_t ib = (is_copy[r] ? r : r + m_nr);
+        const double bTg = mp_dlnkf_dTg[ib] + mp_dlnkeq_dTg[r];
+        mp_dlnkb_dT[r]  = bTg*mp_chain_dT[ib];
+        mp_dlnkb_dTv[r] = bTg*mp_chain_dTv[ib];
+    }
 }
 
 //==============================================================================

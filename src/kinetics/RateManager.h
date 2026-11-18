@@ -59,6 +59,23 @@ public:
      * Updates the current values of the rate coefficients.
      */
     void update(const Thermodynamics::Thermodynamics& thermo);
+
+    /**
+     * Updates the temperature derivatives of the rate coefficients (logarithmic
+     * derivatives with respect to T and Tv) at the current state.  Intended to
+     * be called immediately before the derivative accessors below; less than
+     * repeated finite differences by construction.
+     */
+    void updateDerivative(const Thermodynamics::Thermodynamics& thermo);
+
+    /// \f$ \partial \ln k_f / \partial T \f$ at fixed species densities.
+    const double* const dlnkf_dT() const { return mp_dlnkf_dT; }
+    /// \f$ \partial \ln k_f / \partial T_v \f$ at fixed species densities.
+    const double* const dlnkf_dTv() const { return mp_dlnkf_dTv; }
+    /// \f$ \partial \ln k_b / \partial T \f$ at fixed species densities.
+    const double* const dlnkb_dT() const { return mp_dlnkb_dT; }
+    /// \f$ \partial \ln k_b / \partial T_v \f$ at fixed species densities.
+    const double* const dlnkb_dTv() const { return mp_dlnkb_dTv; }
     
     /**
      * Returns a pointer to the forward rate coefficients evaluated at the 
@@ -121,6 +138,21 @@ private:
     
     /// Storage for species Gibbs free energies
     double* mp_gibbs;
+
+    /// Temperature-derivative block (11*nr doubles):
+    /// [0,nr) dlnkf/dT, [nr,2nr) dlnkf/dTv, [2nr,3nr) dlnkb/dT,
+    /// [3nr,4nr) dlnkb/dTv, [4nr,5nr) dlnkeq/dTg,
+    /// [5nr,7nr) dlnkf/dTg (forward and reverse groups),
+    /// [7nr,9nr) chain dTg/dT, [9nr,11nr) chain dTg/dTv
+    double* mp_deriv_block;
+    double* mp_dlnkf_dT;
+    double* mp_dlnkf_dTv;
+    double* mp_dlnkb_dT;
+    double* mp_dlnkb_dTv;
+    double* mp_dlnkeq_dTg;
+    double* mp_dlnkf_dTg;
+    double* mp_chain_dT;
+    double* mp_chain_dTv;
     
     /// Stores the indices for which the forward and reverse temperature
     /// evaluations are equal

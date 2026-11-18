@@ -62,11 +62,23 @@ public:
         return m_energy_model.energy(T); 
     }
 
+    /// d(energy)/dT in K/K of the vibrator at the given temperature.
+    double denergy(double T) const {
+        return m_energy_model.denergy(T);
+    }
+
     /// Relaxation time of the vibrator.
     /// @todo Find better solution to limit dependency to just thermodynamic
     /// state information, not whole mixture.
     double relaxationTime(const class Thermodynamics::Thermodynamics& thermo) const { 
         return m_relaxation_model.relaxationTime(thermo);
+    }
+
+    /// Analytic partials of the relaxation time (see MillikanWhiteModel).
+    void relaxationTimeJacobian(
+        const class Thermodynamics::Thermodynamics& thermo, double& dT,
+        double* const dRho) const {
+        m_relaxation_model.relaxationTimeJacobian(thermo, dT, dRho);
     }
 
 private:
@@ -92,8 +104,11 @@ public:
     OmegaVT(Mixture&);
     virtual ~OmegaVT() = default;
     virtual double source() override;
+    virtual bool sourceJacobian(
+        double& dT, double& dTv, double* const dRho) override;
 private:
     std::vector<Vibrator> m_vibrators;
+    std::vector<double> m_dtau_drho;
 };
 
 
@@ -136,6 +151,56 @@ double OmegaVT::source()
     }
 
     return src * mixture().density() * RU;
+}
+
+
+bool OmegaVT::sourceJacobian(double& dT, double& dTv, double* const dRho)
+{
+    const int ns = mixture().nSpecies();
+    const double* const Y = mixture().Y();
+    const double T   = mixture().T();
+    const double Tv  = mixture().Tv();
+    const double rho = mixture().density();
+
+    dT = 0.0;
+    dTv = 0.0;
+    for (int i = 0; i < ns; ++i)
+        dRho[i] = 0.0;
+
+    m_dtau_drho.resize(ns);
+
+    // Omega = Ru * sum_i rho_i (e_i(T) - e_i(Tv)) / (M_i tau_i)
+    for (auto& vibrator: m_vibrators)
+    {
+        const int    iv  = vibrator.speciesIndex();
+        const double tau = vibrator.relaxationTime(mixture());
+        const double mw  = vibrator.molecularWeight();
+        const double d   = vibrator.energy(T) - vibrator.energy(Tv);
+        const double rhoi = rho*Y[iv];
+
+        double dtau_dT = 0.0;
+        vibrator.relaxationTimeJacobian(mixture(), dtau_dT, m_dtau_drho.data());
+
+        // tau -> inf (vibrator absent): the term and its partials vanish
+        if (!std::isfinite(tau) || tau == 0.0)
+            continue;
+
+        const double denergy_T  = vibrator.denergy(T);
+        const double denergy_Tv = vibrator.denergy(Tv);
+        const double inv_tau    = 1.0/tau;
+        const double inv_tau2   = inv_tau*inv_tau;
+
+        dT  += RU*rhoi/mw*(denergy_T*inv_tau - d*dtau_dT*inv_tau2);
+        dTv -= RU*rhoi/mw*(denergy_Tv*inv_tau);
+
+        for (int s = 0; s < ns; ++s)
+            dRho[s] -= RU*rhoi/mw*(d*m_dtau_drho[s]*inv_tau2);
+
+        // rho_i = rho*Y_i contributes only to its own species density
+        dRho[iv] += RU*d/(mw*tau);
+    }
+
+    return true;
 }
 
 

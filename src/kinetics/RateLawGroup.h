@@ -108,7 +108,48 @@ public:
         m_reacs.decrReactions(p_g, p_r);
         m_prods.incrReactions(p_g, p_r);
     }
-    
+
+    /**
+     * Accumulates the group-temperature derivative of the equilibrium-constant
+     * term that converts k_f into k_b, for every reaction whose reverse rate
+     * coefficient is evaluated in this group.
+     *
+     * ln k_b = ln k_f + \Delta G/RT - \Delta\nu \ln(P_{atm}/R_uT) with
+     * \partial (G_i/R_uT)/\partial T = -H_i/(R_uT^2) and
+     * \partial \ln T/\partial T = 1/T, so the contribution is
+     * \f$ \sum_{react} (H_i/R_uT - 1)/T - \sum_{prod} (H_i/R_uT - 1)/T \f$
+     * evaluated at the group temperature.
+     *
+     * @note requires m_t to be set by a preceding lnk()/dlnkdT() call.
+     */
+    void accumulateDlnKeq(
+        const size_t ns, const Thermodynamics::Thermodynamics& thermo,
+        double* const p_dlnkeq) const
+    {
+        std::vector<double> mu(ns);
+        thermo.speciesHOverRT(m_t, mu.data());
+        for (size_t i = 0; i < ns; ++i)
+            mu[i] = (mu[i] - 1.0) / m_t;
+
+        m_reacs.incrReactions(mu.data(), p_dlnkeq);
+        m_prods.decrReactions(mu.data(), p_dlnkeq);
+    }
+
+    /**
+     * Evaluates the group-temperature derivative of the rate coefficients and
+     * of the k_f -> k_b conversion, and returns the chain factors that convert
+     * a group-temperature derivative into a derivative with respect to T and Tv.
+     *
+     * Arrays are indexed by the same reaction index used in lnk() (a reversed
+     * rate coefficient of reaction j is stored at j+nReactions), except
+     * p_dlnkeq_dTg which is indexed by the reaction index j and is additive.
+     */
+    virtual void dlnkdT(
+        const Thermodynamics::Thermodynamics& thermo,
+        const Thermodynamics::StateModel* const p_state,
+        double* const p_dlnkf_dTg, double* const p_chain_dT,
+        double* const p_chain_dTv, double* const p_dlnkeq_dTg) = 0;
+
 
 protected:
 
@@ -169,6 +210,36 @@ public:
         //}
 
         // Save this temperature
+        m_last_t = m_t;
+    }
+
+    /**
+     * Evaluates dln(k)/dTg for every rate in this group and writes the chain
+     * factors dTg/dT and dTg/dTv, plus the additive equilibrium-constant term
+     * for the reverse rates handled by this group.
+     */
+    virtual void dlnkdT(
+        const Thermodynamics::Thermodynamics& thermo,
+        const Thermodynamics::StateModel* const p_state,
+        double* const p_dlnkf_dTg, double* const p_chain_dT,
+        double* const p_chain_dTv, double* const p_dlnkeq_dTg)
+    {
+        m_t = TSelectorType().getT(p_state);
+
+        const double lnT  = std::log(m_t);
+        const double invT = 1.0 / m_t;
+        const double dTdT  = TSelectorType().dTdT(p_state);
+        const double dTdTv = TSelectorType().dTdTv(p_state);
+
+        for (int i = 0; i < m_rates.size(); ++i) {
+            const std::pair<size_t, RateLawType>& rate = m_rates[i];
+            p_dlnkf_dTg[rate.first] = rate.second.dlnkdT(lnT, invT);
+            p_chain_dT[rate.first]  = dTdT;
+            p_chain_dTv[rate.first] = dTdTv;
+        }
+
+        accumulateDlnKeq(thermo.nSpecies(), thermo, p_dlnkeq_dTg);
+
         m_last_t = m_t;
     }
 
@@ -257,6 +328,24 @@ public:
         GroupMap::iterator iter = m_group_map.begin();
         for ( ; iter != m_group_map.end(); ++iter)
             iter->second->lnk(p_state, p_lnk);
+    }
+
+    /**
+     * Evaluates dln(k)/dTg and the chain factors for every group in the
+     * collection.  p_dlnkeq_dTg must be zeroed by the caller and is indexed by
+     * the reaction index.
+     */
+    void dlnkdT(
+        const Thermodynamics::Thermodynamics& thermo,
+        const Thermodynamics::StateModel* const p_state,
+        double* const p_dlnkf_dTg, double* const p_chain_dT,
+        double* const p_chain_dTv, double* const p_dlnkeq_dTg)
+    {
+        GroupMap::iterator iter = m_group_map.begin();
+        for ( ; iter != m_group_map.end(); ++iter)
+            iter->second->dlnkdT(
+                thermo, p_state, p_dlnkf_dTg, p_chain_dT, p_chain_dTv,
+                p_dlnkeq_dTg);
     }
     
     /**

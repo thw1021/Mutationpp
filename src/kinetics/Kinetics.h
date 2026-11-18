@@ -182,6 +182,19 @@ public:
     void netProductionRates(double* const p_wdot);
 
     /**
+     * Fills the temperature derivatives of the net species production rates at
+     * fixed species densities,
+     * \f$ \partial\dot{\omega}_i/\partial T \f$ and
+     * \f$ \partial\dot{\omega}_i/\partial T_v \f$, using the analytic rate-law
+     * derivatives (no finite differences).
+     *
+     * @param p_dT   on return, \f$\partial\dot{\omega}_i/\partial T\f$ (kg/m^3-s-K)
+     * @param p_dTv  on return, \f$\partial\dot{\omega}_i/\partial T_v\f$ (kg/m^3-s-K)
+     */
+    void netProductionRatesJacobian(
+        double* const p_dT, double* const p_dTv);
+
+    /**
      * Fills the matrix p_jac with the species production rate jacobian matrix
      * \f[
      * J_{ij} = \frac{\partial \dot{\omega}_i}{\partial \rho_j}

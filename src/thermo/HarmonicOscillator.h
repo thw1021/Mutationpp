@@ -45,6 +45,9 @@ public:
     /// Returns energy of vibrator in K at given temperature in K.
     double energy(double T) const;
 
+    /// Returns d(energy)/dT of vibrator in K/K at given temperature in K.
+    double denergy(double T) const;
+
     /// Convience function to access characteristic temperatures in K.
     const std::vector<double>& characteristicTemperatures() const {
         return m_characteristic_temps;

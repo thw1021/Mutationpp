@@ -139,6 +139,23 @@ public:
     /// Relaxation time of the vibrator.
     double relaxationTime(const Mutation::Thermodynamics::Thermodynamics&) const;
 
+    /**
+     * Analytic derivatives of the relaxation time with respect to the heavy
+     * particle temperature, \f$ \partial\tau/\partial T \f$, and to each species
+     * density, \f$ \partial\tau/\partial\rho_s \f$ (array of size
+     * Thermodynamics::nSpecies()).  The relaxation time does not depend on Tv.
+     *
+     * Uses the same Millikan-White + Park expressions as relaxationTime(), so
+     * the derivatives are exact for this model (no finite differences).  When
+     * the Park term is unbounded (vibrator species absent, tau -> inf) the
+     * partials are set to zero, which is the correct derivative of the product
+     * form \f$ \rho_i/\tau_i \f$ in that limit only when the numerator also
+     * vanishes; callers must have already excluded that case, and OmegaVT does.
+     */
+    void relaxationTimeJacobian(
+        const Mutation::Thermodynamics::Thermodynamics&, double& dT,
+        double* const dRho) const;
+
     const MillikanWhiteModelData& data() const { return m_data; }
 
 private:

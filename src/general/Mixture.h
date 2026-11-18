@@ -81,6 +81,16 @@ public:
     }
 
     /**
+     * Analytic value and derivatives of the energy transfer source terms with
+     * respect to T, Tv and the species densities.  Returns false when the
+     * active state model cannot supply them analytically.
+     */
+    bool energyTransferSourceJacobian(
+        double* const p_source, double& dT, double& dTv, double* const dRho) {
+        return state()->energyTransferSourceJacobian(p_source, dT, dTv, dRho);
+    }
+
+    /**
      * Add a named element composition to the mixture which may be retrieved
      * with getComposition().
      */
