@@ -231,11 +231,29 @@ public:
         const double dTdT  = TSelectorType().dTdT(p_state);
         const double dTdTv = TSelectorType().dTdTv(p_state);
 
+        /* D72: in a single-temperature model Tv and Te are not independent
+         * variables - the state model pins them to T (Tv() == Te() == T() by
+         * construction), so the rate temperature T_g = T_g(T, Tv, Te) responds
+         * to a change in T through *every* selector channel, while it has no
+         * independent Tv channel at all (a finite difference that perturbs Tv
+         * alone leaves the state model unchanged, hence dT_g/dTv = 0).
+         * Without this collapse ParkSelector returned dT_g/dT = 0.5 instead of
+         * 1 and dT_g/dTv = 0.5 instead of 0, and TeSelector returned
+         * dT_g/dT = 0 instead of 1, so every Park and electron-temperature
+         * reaction carried a wrong temperature derivative (and a spurious
+         * d(omega)/dTv). */
+        double chainT  = dTdT;
+        double chainTv = dTdTv;
+        if (thermo.nEnergyEqns() == 1) {
+            chainT  = dTdT + dTdTv;
+            chainTv = 0.0;
+        }
+
         for (int i = 0; i < m_rates.size(); ++i) {
             const std::pair<size_t, RateLawType>& rate = m_rates[i];
             p_dlnkf_dTg[rate.first] = rate.second.dlnkdT(lnT, invT);
-            p_chain_dT[rate.first]  = dTdT;
-            p_chain_dTv[rate.first] = dTdTv;
+            p_chain_dT[rate.first]  = chainT;
+            p_chain_dTv[rate.first] = chainTv;
         }
 
         accumulateDlnKeq(thermo.nSpecies(), thermo, p_dlnkeq_dTg);
