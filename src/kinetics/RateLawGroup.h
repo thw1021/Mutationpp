@@ -126,10 +126,19 @@ public:
         const size_t ns, const Thermodynamics::Thermodynamics& thermo,
         double* const p_dlnkeq) const
     {
-        std::vector<double> mu(ns);
-        thermo.speciesHOverRT(m_t, mu.data());
+        // D75 (SU2 NEMO): differentiate the same G/RT that subtractLnKeq()
+        // evaluates, instead of using the analytic -H/(R T^2).  The electronic
+        // Boltzmann factors are tabulated (RrhoDB m_use_tables) and the table
+        // interpolates Z and T^2 dZ/dT independently, so -H/(R T^2) is not the
+        // derivative of the tabulated G/RT (relative error up to 2e-4 at
+        // 8000-12000 K).  See SU2 Docs/NEMOReport/reports/
+        // NMP-D75_keq_table_rootcause_2026-11-23.md.
+        std::vector<double> mu(ns), gp(ns), gm(ns);
+        const double hstep = 1.0e-5 * m_t;
+        thermo.speciesSTGOverRT(m_t + hstep, gp.data());
+        thermo.speciesSTGOverRT(m_t - hstep, gm.data());
         for (size_t i = 0; i < ns; ++i)
-            mu[i] = (mu[i] - 1.0) / m_t;
+            mu[i] = -(gp[i] - gm[i]) / (2.0 * hstep) + 1.0 / m_t;
 
         m_reacs.incrReactions(mu.data(), p_dlnkeq);
         m_prods.decrReactions(mu.data(), p_dlnkeq);
