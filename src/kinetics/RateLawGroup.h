@@ -133,12 +133,18 @@ public:
         // derivative of the tabulated G/RT (relative error up to 2e-4 at
         // 8000-12000 K).  See SU2 Docs/NEMOReport/reports/
         // NMP-D75_keq_table_rootcause_2026-11-23.md.
+        // D84 (SU2 NEMO, 2026-11-26): the pressure term is -\Delta\nu ln(Patm/RT),
+        // whose T-derivative is +\Delta\nu/T, i.e. each species contributes
+        // -1/T.  D75 had +1/T here, which differentiates +ln T instead; the
+        // resulting analytic Jacobian was wrong by -2\Delta\nu/T and the D75
+        // P4 gate failed with p99.9/max ~ 1.0303.  The tabulated-G/RT central
+        // difference above is retained; only the pressure-term sign is fixed.
         std::vector<double> mu(ns), gp(ns), gm(ns);
         const double hstep = 1.0e-5 * m_t;
         thermo.speciesSTGOverRT(m_t + hstep, gp.data());
         thermo.speciesSTGOverRT(m_t - hstep, gm.data());
         for (size_t i = 0; i < ns; ++i)
-            mu[i] = -(gp[i] - gm[i]) / (2.0 * hstep) + 1.0 / m_t;
+            mu[i] = -(gp[i] - gm[i]) / (2.0 * hstep) - 1.0 / m_t;
 
         m_reacs.incrReactions(mu.data(), p_dlnkeq);
         m_prods.decrReactions(mu.data(), p_dlnkeq);
